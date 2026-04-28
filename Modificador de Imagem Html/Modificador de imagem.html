@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Modificador de imagem</title>
+
+<style>
+
+body{
+margin:0;
+font-family:Segoe UI;
+background:#0f172a;
+color:white;
+display:flex;
+height:100vh;
+}
+
+/* SIDEBAR */
+
+.sidebar{
+width:260px;
+background:#020617;
+padding:20px;
+border-right:1px solid #1e293b;
+}
+
+.sidebar h2{
+margin-top:0;
+}
+
+.control{
+margin-bottom:16px;
+}
+
+input[type=range]{
+width:100%;
+}
+
+/* BOTÕES */
+
+button{
+width:100%;
+padding:10px;
+margin-top:6px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+.primary{background:#14b8a6;color:black}
+.secondary{background:#1e293b;color:white}
+
+/* ÁREA PRINCIPAL */
+
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+}
+
+.preview{
+display:flex;
+gap:20px;
+}
+
+.panel{
+text-align:center;
+}
+
+canvas{
+max-width:400px;
+background:black;
+border-radius:8px;
+}
+
+.drop{
+border:2px dashed #334155;
+padding:20px;
+margin-bottom:10px;
+border-radius:10px;
+color:#94a3b8;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>Ferramentas</h2>
+
+<label class="secondary">
+Selecionar imagem
+<input type="file" id="fileInput" hidden>
+</label>
+
+<div class="control">
+<label>Brilho</label>
+<input type="range" id="brightness" min="-100" max="100" value="0">
+</div>
+
+<div class="control">
+<label>Contraste</label>
+<input type="range" id="contrast" min="-100" max="100" value="0">
+</div>
+
+<div class="control">
+<label>Saturação</label>
+<input type="range" id="saturation" min="-100" max="100" value="0">
+</div>
+
+<div class="control">
+<label>Blur</label>
+<input type="range" id="blur" min="0" max="10" value="0">
+</div>
+
+<button id="grayBtn" class="primary">Grayscale</button>
+<button id="sepiaBtn" class="secondary">Sépia</button>
+<button id="edgeBtn" class="secondary">Detectar Bordas</button>
+
+<button id="resetBtn" class="secondary">Restaurar</button>
+<button id="downloadBtn" class="secondary">Baixar imagem</button>
+
+</div>
+
+<div class="main">
+
+<div class="drop" id="dropArea">
+Arraste uma imagem aqui
+</div>
+
+<div class="preview">
+
+<div class="panel">
+<h3>Original</h3>
+<canvas id="originalCanvas"></canvas>
+</div>
+
+<div class="panel">
+<h3>Editada</h3>
+<canvas id="editCanvas"></canvas>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+/* ELEMENTOS */
+
+const originalCanvas=document.getElementById("originalCanvas")
+const editCanvas=document.getElementById("editCanvas")
+
+const octx=originalCanvas.getContext("2d")
+const ectx=editCanvas.getContext("2d")
+
+const fileInput=document.getElementById("fileInput")
+const dropArea=document.getElementById("dropArea")
+
+const brightness=document.getElementById("brightness")
+const contrast=document.getElementById("contrast")
+const saturation=document.getElementById("saturation")
+const blur=document.getElementById("blur")
+
+const grayBtn=document.getElementById("grayBtn")
+const sepiaBtn=document.getElementById("sepiaBtn")
+const edgeBtn=document.getElementById("edgeBtn")
+
+const resetBtn=document.getElementById("resetBtn")
+const downloadBtn=document.getElementById("downloadBtn")
+
+let originalImage=null
+
+/* CARREGAR IMAGEM */
+
+function loadImage(file){
+
+const reader=new FileReader()
+
+reader.onload=function(e){
+
+const img=new Image()
+
+img.onload=function(){
+
+originalImage=img
+
+originalCanvas.width=img.width
+originalCanvas.height=img.height
+
+editCanvas.width=img.width
+editCanvas.height=img.height
+
+octx.drawImage(img,0,0)
+
+render()
+
+}
+
+img.src=e.target.result
+
+}
+
+reader.readAsDataURL(file)
+
+}
+
+/* PIPELINE DE RENDERIZAÇÃO */
+
+function render(){
+
+if(!originalImage) return
+
+ectx.clearRect(0,0,editCanvas.width,editCanvas.height)
+
+let b=1+(brightness.value/100)
+let c=1+(contrast.value/100)
+let s=1+(saturation.value/100)
+let bl=blur.value
+
+ectx.filter=`
+brightness(${b})
+contrast(${c})
+saturate(${s})
+blur(${bl}px)
+`
+
+ectx.drawImage(originalImage,0,0)
+
+ectx.filter="none"
+
+}
+
+/* SLIDERS */
+
+brightness.oninput=render
+contrast.oninput=render
+saturation.oninput=render
+blur.oninput=render
+
+/* GRAYSCALE */
+
+grayBtn.onclick=function(){
+
+let imgData=ectx.getImageData(0,0,editCanvas.width,editCanvas.height)
+let d=imgData.data
+
+for(let i=0;i<d.length;i+=4){
+
+let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]
+
+d[i]=d[i+1]=d[i+2]=g
+
+}
+
+ectx.putImageData(imgData,0,0)
+
+}
+
+/* SÉPIA */
+
+sepiaBtn.onclick=function(){
+
+let imgData=ectx.getImageData(0,0,editCanvas.width,editCanvas.height)
+let d=imgData.data
+
+for(let i=0;i<d.length;i+=4){
+
+let r=d[i]
+let g=d[i+1]
+let b=d[i+2]
+
+d[i]=0.393*r+0.769*g+0.189*b
+d[i+1]=0.349*r+0.686*g+0.168*b
+d[i+2]=0.272*r+0.534*g+0.131*b
+
+}
+
+ectx.putImageData(imgData,0,0)
+
+}
+
+/* DETECÇÃO DE BORDAS - SOBEL */
+
+edgeBtn.onclick=function(){
+
+let w=editCanvas.width
+let h=editCanvas.height
+
+let imgData=ectx.getImageData(0,0,w,h)
+let data=imgData.data
+
+let gray=[]
+
+for(let i=0;i<data.length;i+=4){
+
+gray.push((data[i]+data[i+1]+data[i+2])/3)
+
+}
+
+for(let y=1;y<h-1;y++){
+
+for(let x=1;x<w-1;x++){
+
+let i=y*w+x
+
+let gx=
+-gray[i-w-1]-2*gray[i-1]-gray[i+w-1]
++gray[i-w+1]+2*gray[i+1]+gray[i+w+1]
+
+let gy=
+-gray[i-w-1]-2*gray[i-w]-gray[i-w+1]
++gray[i+w-1]+2*gray[i+w]+gray[i+w+1]
+
+let g=Math.sqrt(gx*gx+gy*gy)
+
+let idx=i*4
+
+data[idx]=data[idx+1]=data[idx+2]=g
+
+}
+
+}
+
+ectx.putImageData(imgData,0,0)
+
+}
+
+/* RESET */
+
+resetBtn.onclick=function(){
+
+brightness.value=0
+contrast.value=0
+saturation.value=0
+blur.value=0
+
+render()
+
+}
+
+/* DOWNLOAD */
+
+downloadBtn.onclick=function(){
+
+let link=document.createElement("a")
+
+link.href=editCanvas.toDataURL()
+
+link.download="imagem_editada.png"
+
+link.click()
+
+}
+
+/* DRAG DROP */
+
+fileInput.onchange=e=>{
+if(e.target.files[0]) loadImage(e.target.files[0])
+}
+
+dropArea.ondragover=e=>e.preventDefault()
+
+dropArea.ondrop=e=>{
+e.preventDefault()
+loadImage(e.dataTransfer.files[0])
+}
+
+</script>
+
+</body>
+</html>
